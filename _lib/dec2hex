@@ -1,0 +1,148 @@
+<?php 
+
+require '/scripts/_lib/consoleIO';
+
+$root = "./";
+$ignore = array( '&#x000A;' );
+
+IO::sT( 'Performing Dec2Hex Operations' );
+
+IO::sL( 'Scanning directory '.$root );
+
+$dirFiles = scandir( $root );
+$files = array();
+$filesName = array();
+
+foreach( $dirFiles as $i => $f )
+{
+
+	if( $f == '.' || $f == '..' || $f == basename(__FILE__) ) continue;
+
+	IO::o( 'Reading '.$f );
+	$files[] = file_get_contents( $root.$f );
+	$filesName[] = $f;
+
+}
+
+IO::eL();
+
+$allMatches = array();
+foreach( $files as $i => $f )
+{
+
+	$matches = array();
+	preg_match_all( '/&#[0-9]*?;/', $f, $matches );
+	$allMatches[] = $matches;
+
+}
+
+$toConvert = array();
+$notToConvert = array();
+$toConvertTo = array();
+$totalCount = 0;
+$totalCountDone = 0;
+
+IO::sL( 'Decimal HTML entity instances found in files:' );
+
+foreach( $allMatches as $i => $m )
+{
+	if( !isset( $m[0] ) || !is_array( $m[0] ) || !( sizeof( $m[0] ) > 0 ) ) continue;
+	//IO::o( 'Matches in '.$filesName[$i] );
+
+	$currentMatches = $m[0];
+	for( $j=0; $j<sizeof( $currentMatches ); $j++ )
+	{
+		if( in_array( $currentMatches[$j], $ignore ) )
+		{
+				$notToConvert[] = $currentMatches[$j];
+				continue;
+		}
+
+		$totalCount++;
+
+		if( !in_array( $currentMatches[$j], $toConvert ) )
+		{
+			$toConvert[] = $currentMatches[$j];
+			$hex = substr( $currentMatches[$j], 2 );
+			$hex = substr( $hex, 0, strlen( $hex ) - 1 );
+			$hex = '&#x'.dechex( $hex ).';';
+			$toConvertTo[] = $hex;
+			IO::o( 'Converting'.'%R'.str_pad( $currentMatches[$j], 10, ' ', STR_PAD_LEFT ).'%n to %G'.str_pad( $hex, 10, ' ', STR_PAD_RIGHT )."%n".'%w[ %W'.html_entity_decode($hex).'%n %w]%n' );
+		}
+	}
+}
+
+IO::eL();
+
+if( sizeof($allMatches[0][0]) === 0 )
+{
+	IO::o( 'No entities were found...' );
+}
+
+IO::sL( 'Instances ignored:' );
+foreach( $notToConvert as $i => $v )
+{
+	IO::o( 'Ignoring '.$v );
+}
+
+IO::eL();
+
+if( sizeof($notToConvert) === 0)
+{
+	IO::o('No entities were ignored...');
+}
+
+for( $i = 0; $i < sizeof( $files ); $i++ )
+{
+
+	foreach( $toConvert as $j => $hex )
+	{
+
+		$count = 0;
+		$files[$i] = str_replace( $hex, $toConvertTo[$j], $files[$i], $count );
+		$totalCountDone = $totalCountDone + $count;
+
+	}
+
+}
+
+IO::oA( 'Instances found/converted: '.$totalCount.'/'.$totalCountDone );
+
+if( $totalCount > 0 )
+{
+
+	if( IO::askBool( 'Write changes to disk', IO::AskNo ) === false )
+	{
+		IO::e( 'Not writing changes to disk - exiting...' );
+	}
+
+	IO::sL( 'Writing changes to disk...' );
+	foreach( $filesName as $i => $fn )
+	{
+
+		$toPut = $files[$i];
+		if( ( $bytes = file_put_contents( $root.$fn, $toPut ) ) === false )
+		{
+			IO::o( 'Count not write to '.$fn, IO::LevelWarning );
+		}
+		else
+		{
+			//str_pad( $bytes, 10, ' ', STR_PAD_LEFT )
+			IO::o( 'Writing '.$fn );
+		}
+
+	}
+	IO::eL();
+	IO::oA( 'Wrote out new files successfully!');
+
+}
+else
+{
+
+	IO::oA( 'Nothing found to convert...' );
+
+}
+
+IO::o( 'All done - goodbye...' );
+exit( 0 );
+?>

@@ -1,0 +1,110 @@
+<?php 
+
+$root = './';
+$pattern_desc = array(
+	'Watch out for nspaces, mspaces, hairspaces, etc as they will not render properly in Adobe Digital Editions',
+	'ASCII (127-256) characters should be converted to unicode',
+	'There should not be spaces at the beginning of lines',
+	'There should not be spaces at the end of lines',
+	'There should not be double (or more) spaces anywhere',
+	'There should not be two consecutive (or more) newlines (\n) or returns (\r) anywhere',
+	'All ellipses should be converted to \&#160;.\&#160;.\&#160;.',
+	'There should not be spaces proceeding a closing tag',
+	'A character should not follow a closing tag immediatly',
+	'A character should not proceed an opening tag immediatly',
+	'A character should not follow a closing tag immediatly',
+	'A character should not proceed an opening tag immediatly',
+	'There should be no empty <i> tags',
+	'There should be no empty <b> tags',
+	'There should be no empty tags at all',
+	'The HTML less-than entity should be converted to decimal',
+	'The HTML greater-than entity should be converted to decimal'
+);
+
+$patterns = array(
+	'&#xA0;|&#x2002;|&#8195;|&#8194;|&#x00AD;|&#x2003;|&#x2009;|&#8201;|&#x200A',
+	'[‚ƒ„…†‡ˆ‰Š‹Œ‘’“”•–—˜™š›œžŸ¡-¬®-ÿ]|[^\t-~]',
+	'^\t*(<[^>]*)>( )',
+	'( ){2,}$',
+	'( ){2,}',
+	'(\n|\r){2,}',
+	'\. ?\. ?\.',
+	'([ ]+)<(\/[^>]*)>',
+	'<\/i>([A-Za-z]+)',
+	'([A-Za-z]+)<i>',
+	'<\/b>([A-Za-z]+)',
+	'([A-Za-z]+)<b>',
+	'<i>([ ]*)<\/i>',
+	'<b>([ ]*)*<\/b>',
+	'<([^\/>]*)><(\/[^>]*)>',
+	'&lt;',
+	'&gt;'
+);
+
+require '/scripts/_lib/consoleIO';
+
+IO::sT( 'Automated ScML Quality Control Operations' );
+IO::sT( 'by Rob Frawley of Scribe Inc.' );
+
+IO::sL( 'Scanning directory for ScML files' );
+
+$dir = scandir( $root );
+$files = array();
+$contents = array();
+foreach( $dir as $i => $f )
+{
+	$ext = pathinfo( $f, PATHINFO_EXTENSION );
+	if( $ext === 'scml' )
+	{
+		IO::o( 'Reading ' . $f . '...' );
+		$files[] = $f;
+		$contents[] = file_get_contents( $root . $f );
+	}
+}
+
+IO::eL();
+
+if( sizeof( $files ) === 0 )
+{
+	IO::e( 'Could not find any ScML files...' );
+}
+
+$globalFound = false;
+
+for( $i=0; $i<sizeof( $patterns ); $i++ )
+{
+	IO::sL( 'Searching for pattern "'.$patterns[$i].'"' );
+	$found = false;
+	for( $j=0; $j<sizeof($files); $j++ )
+	{
+		$matches = array();
+		preg_match_all( '/'.$patterns[$i].'/', $contents[$j], $matches );
+		if( sizeof( $matches[0] ) !== 0 )
+		{
+			$found = true;
+			$globalFound = true;
+			IO::o( 'Found in "'.$files[$j].'" '.sizeof($matches[0]).' times' );
+		}
+	}
+
+	IO::eL();
+
+	if( $found === true )
+	{
+		IO::warn( $pattern_desc[$i] );
+	}
+	else
+	{
+		//IO::oA( 'No matches found for pattern!' );
+	}
+
+}
+
+if( $globalFound === true )
+{
+	IO::o( 'Review http://learning.scribenet.com/node/2066#cleanup and http://learning.scribenet.com/node/2070 to cleanup your file...', IO::LevelWarning );
+}
+
+IO::done( 'All done; goodbye...' );
+
+?>
