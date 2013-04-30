@@ -3,6 +3,9 @@ Darwin Scripts (repo: scripts-darwin)
 
 Set of simple script to help manage ScML, ePub and Mobi creation on Darwin systems (Mac OS X based).
 
+## Notice
+This is the *development branch* of the repo. If you are looking for *slightly* more *production ready* scripts, I suggest looking at the master branch... Otherwise, enjoy!
+
 ## Install
 A scripts directory should be created at the system root level on your computer. To clone directly from Git, I suggest the following:
 * `mkdir ~/scripts` to create a scripts folder in your user home
