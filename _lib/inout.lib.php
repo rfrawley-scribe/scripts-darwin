@@ -2,17 +2,75 @@
 
 require '/scripts/_lib/consoleColor.php';
 
-interface Base_Interface
+
+
+interface InOut_Interface
 {
 
 }
 
-abstract class Base implements Base_Interface
+abstract class InOut_Abstract implements InOut_Interface
 {
 
 }
 
-class IO extends Base
+class InOut extends InOut_Abstract
+{
+	
+	const LevelNotice = 0;
+	
+	protected $_debug  = false;
+	protected $_colors = true;
+	protected $_log    = array();
+	protected $_log_i  = 0;
+	protected $_tpl    = '%K[ %TIMECOUNT% %SELF% ] %PREMSG%%MSG%%POSTMSG%';
+
+	public function setDebug ( $bool ) { $this->_debug = (boolean)$bool; }
+	public function getDebug () { return (boolean)$this->_debug; }
+	public function setColors( $bool ) { $this->_colors = (boolean)$bool; }
+	public function getColors() { return (boolean)$this->_colors; }
+	public function setTpl   ( $tpl ) { $this->_tpl = (string)$tpl; }
+	public function getTpl   () { return (string)$this->_tpl; }
+
+	public function __construct( $debug = false, $colors = true )
+	{
+		$this->setDebug( $debug );
+		$this->setColors( $colors );
+	}
+	
+	public function put( $msg, $msg_level = InOut::LevelNotice, $msg_post = "\n" )
+	{
+
+		
+
+		$put = str_replace( '%SELF%',      basename( __FILE__ ),                          $this->getTpl() );
+		$put = str_replace( '%TIMECOUNT%', $timecount,                                    $put );
+		$put = str_replace( '%PREMSG%',    $this->_buildMsgPre( $msg_level ),             $put );
+		$put = str_replace( '%MSG%',       $this->_buildMsg( $msg, $msg_level ),          $put );
+		$put = str_replace( '%POSTMSG%',   $this->_buildMsgPost( $msg_post, $msg_level ), $put );
+		
+		fputs( STDOUT, $put );
+		
+	}
+	
+	protected function _buildMsg( $msg, $msg_level )
+	{
+		return $msg;
+	}
+	
+	protected function _buildMsgPre( $msg_level )
+	{
+		return time();
+	}
+	
+	protected function _buildMsgPost( $msg, $msg_level )
+	{
+		return $msg;
+	}
+
+}
+
+class InOutOld extends InOut_Abstract
 {
 	const LevelTitle   = -3;
 	const LevelInfo    = -20;
