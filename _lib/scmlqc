@@ -43,6 +43,8 @@ $patterns = array(
 
 require '/scripts/_lib/consoleIO';
 
+exec( 'rm -fr '.$root.'*xml-error.txt > /dev/null' );
+
 IO::sT( 'Automated ScML Quality Control Operations' );
 IO::sT( 'by Rob Frawley of Scribe Inc.' );
 
@@ -69,12 +71,75 @@ if( sizeof( $files ) === 0 )
 	IO::e( 'Could not find any ScML files...' );
 }
 
+$xmllintReturns = array(
+	1 => 'Unclassified',
+	2 => 'Error in DTD',
+	3 => 'Validation error',
+	4 => 'Validation error',
+	5 => 'Error in schema compilation',
+	6 => 'Error writing output',
+	7 => 'Error in pattern (--patten option)',
+	8 => 'Error in Reader registration (--chregister option)',
+	9 => 'Out of memory'
+);
+
+IO::os( 'Validating documents against ScML DTD' );
+for( $i=0; $i<sizeof($files); $i++)
+{
+	IO::status_info( 'Checking file ' . $files[$i] );
+
+	$return = 0;
+	$output = '';
+	exec( 'xmllint --valid --loaddtd --noout ' . $root . $files[$i] . ' 2>&1', $output, $return );
+
+	if( $return === 0 )
+	{
+
+		IO::status_result_good( 'valid' );
+		continue;
+
+	}
+	else
+	{
+
+		IO::status_result_bad( 'not valid' );
+
+		if( array_key_exists( $return, $xmllintReturns ) )
+		{
+			$errorMsg = $xmllintReturns[ $return ];
+		}
+		else
+		{
+			$errorMsg = 'Undefinable error';
+		}
+
+		//IO::warn( 'Error: '.$errorMsg );
+
+		$outputToFile = '';
+		$errorFile = $root . $files[$i] . '.xml-error.txt';
+		for( $j=0; $j<sizeof($output); $j++ )
+		{
+			$outputToFile .= $output[$j]."\n";
+		}
+		file_put_contents( $errorFile, $outputToFile );
+
+		IO::warn( 'Error: '.$errorMsg . ' / More info: '.$errorFile );
+
+	}
+
+}
+
 $globalFound = false;
+
+IO::oS( 'Checking files against regular expression QC list' );
 
 for( $i=0; $i<sizeof( $patterns ); $i++ )
 {
-	IO::sL( 'Searching for pattern "'.$patterns[$i].'"' );
+	IO::status_info( 'Checking for "'.$patterns[$i].'" regex pattern' );
+
 	$found = false;
+	$errorFound = array();
+
 	for( $j=0; $j<sizeof($files); $j++ )
 	{
 		$matches = array();
@@ -83,7 +148,8 @@ for( $i=0; $i<sizeof( $patterns ); $i++ )
 		{
 			$found = true;
 			$globalFound = true;
-			IO::o( 'Found in "'.$files[$j].'" '.sizeof($matches[0]).' times' );
+			$errorFound[] = $files[$j] . ' (' . sizeof( $matches[0] ) . ' times)';
+			//IO::o( 'Found in "'.$files[$j].'" '.sizeof($matches[0]).' times' );
 		}
 	}
 
@@ -91,20 +157,31 @@ for( $i=0; $i<sizeof( $patterns ); $i++ )
 
 	if( $found === true )
 	{
-		IO::warn( $pattern_desc[$i] );
+		IO::status_result_bad();
+
+		IO::warn( 'Error: '.$pattern_desc[$i] );
+
+		for( $j=0; $j<sizeof($errorFound); $j++ )
+		{
+			IO::warn( '   --> ' . $errorFound[$j] );
+		}
+		
 	}
 	else
 	{
+		IO::status_result_good();
 		//IO::oA( 'No matches found for pattern!' );
 	}
 
 }
 
-if( $globalFound === true )
-{
-	IO::o( 'Review http://learning.scribenet.com/node/2066#cleanup and http://learning.scribenet.com/node/2070 to cleanup your file...', IO::LevelWarning );
-}
+//if( $globalFound === true )
+//{
+	IO::oS( 'Do not forget final QC checks' );
+	IO::o( 'Review http://learning.scribenet.com/node/2066#cleanup' );
+	IO::o( 'Review http://learning.scribenet.com/node/2070' );
+//}
 
-IO::done( 'All done; goodbye...' );
+IO::done( 'Script says, "goodbye..."' );
 
 ?>
