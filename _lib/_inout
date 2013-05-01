@@ -1,286 +1,218 @@
 <?php
 
-namespace Paced/Events 
+require '/scripts/_lib/_inoutColor';
+
+interface InOut_Interface {}
+
+abstract class InOut_Abstract implements InOut_Interface 
 {
 
-	interface Observer_Pattern_Observer
+	const Level_Notice   = 0;
+	const Level_Warning  = 10;
+	const Level_Ask      = 20;
+	const Level_Error    = 100;
+	const Level_Critical = 101;
+
+	const Level_Title    = 500;
+	const Level_Author   = 501;
+	const Level_H1       = 510;
+
+	const Level_Status     = 800;
+	const Level_StatusGood = 810;
+	const Level_StatusBad  = 820;
+
+	protected $_count         = 0;
+	protected $_debug         = false;
+	protected $_color         = true;
+	protected $_ConsoleColor  = null;
+	protected $_template_pre  = '[ %TIMECOUNT% %SELF% ]  %SEP%  ';
+	protected $_template_main = '%MAIN%';
+	protected $_template_post = '%END%';
+
+	public function __construct( $debug = false, $color = true, $ConsoleColor = null )
 	{
-		public function update();
+		$this->setDebug( $debug );
+		$this->setColor( $color );
+		if( ! $ConsoleColor instanceof Console_Color2 ) $ConsoleColor = new Console_Color2();
+		$this->setConsoleColor( $ConsoleColor );
 	}
 
-	interface Observer_Pattern_Subject
+	public function setDebug( $debug )
 	{
-		public function 
+		$this->_debug = (boolean)$debug;
 	}
 
-	class Observer implements Event_Interface 
+	public function getDebug()
 	{
-
-
+		return (boolean)$this->_debug;
 	}
 
-	interface Event_Output_Interface {}
-	
-	class Event_Output implements Event_Output_Interface;
+	public function setCount( $count )
+	{
+		$this->_count = (int)$count;
+	}
+
+	public function getCount()
+	{
+		return (int)$this->_count;
+	}
+
+	public function addCount( $add = 1 )
+	{
+		$this->setCount( $this->getCount() + $add );
+	}
+
+	public function setColor( $color )
+	{
+		$this->_color = (boolean)$color;
+	}
+
+	public function getColor()
+	{
+		return (boolean)$this->_color;
+	}
+
+	public function setConsoleColor( Console_Color2 $ConsoleColor )
+	{
+		$this->_ConsoleColor = (object)$ConsoleColor;
+	}
+
+	public function getConsoleColor()
+	{
+		return (object)$this->_ConsoleColor;
+	}
+
+	public function title( $message )
+	{
+		$this->put( $message, self::Level_Title );
+	}
+
+	public function author( $message )
+	{
+		$this->put( $message, self::Level_Author );
+	}
+
+	public function h1( $message )
+	{
+		$this->put( $message, self::Level_H1 );
+	}
+
+	public function status( $message )
+	{
+		$this->put( $message . '...', self::Level_Status, '' );
+	}
+
+	public function status_good( $message = 'Ok' )
+	{
+		$this->put( $message, self::Level_StatusGood, "\n", true );
+	}
+
+	public function status_bad( $message = 'Error' )
+	{
+		$this->put( $message, self::Level_StatusBad, "\n", true );
+	}
+
+	abstract public function put( $message, $level = self::Level_Notice, $post = "\n" );
 
 }
 
-interface Base_Interface
+class InOut extends InOut_Abstract
 {
 
-}
-
-abstract class Base implements Base_Interface
-{
-
-}
-
-interface Console_Interface
-{
-
-}
-
-class Console extends Base implements Console_Interface
-{
-
-	
-	
-}
-
-class IO extends Base
-{
-	const LevelTitle   = -3;
-	const LevelInfo    = -20;
-	const LevelSection = -2;
-	const LevelNone    = -1;
-	const LevelNotice  = 0;
-	const LevelResult  = -10;
-	const LevelWarning = 1;
-	const LevelWarn    = 10;
-	const LevelError   = 2;
-	const LevelFatal   = 3;
-	const LevelExit	   = 4;
-	const LevelAsk	   = 100;
-	const AskNo		   = false;
-	const AskYes	   = true;
-
-	static $colors	   = true;
-
-	static $CC          = false;
-	static $inList		= false;
-	static $countList	= 1;
-
-	static $count       = 0;
-
-	static function disableColors()
-	{
-		IO::$colors = false;
-	}
-
-	static function enableColors()
-	{
-		IO::$colors = true;
-	}
-
-	static function e( $message, $logLevel = IO::LevelError, $exitCode = -1 )
-	{
-		IO::outLine( $message, $logLevel );
-		exit( $exitCode );
-	}
-
-	static function warn( $message, $logLevel = IO::LevelWarn )
-	{
-		IO::outLine( $message, $logLevel );
-	}
-
-	static function done( $message, $logLevel = IO::LevelExit, $exitCode = 0 )
-	{
-		IO::outLine( $message, $logLevel );
-		exit( $exitCode );
-	}
-
-	static function sT( $message, $logLevel = IO::LevelTitle )
-	{
-		IO::outLine( $message, $logLevel );
-	}
-
-
-	static function sL( $message, $logLevel = IO::LevelSection )
-	{
-		IO::outLine( $message, $logLevel );
-		IO::$inList = true;
-	}
-	
-	static function eL()
-	{
-		IO::$inList = false;
-		IO::$countList = 1;
-	}
-
-	static function o( $message, $logLevel = IO::LevelNone )
+	public function put( $message, $level = self::Level_Notice, $post = "\n", $nopre = false )
 	{
 
-		IO::outLine( $message, $logLevel );
+		$out = '';
 
-	}
-
-	static function status_info( $message, $logLevel = IO::LevelNone )
-	{
-
-		IO::outLine( $message, $logLevel, '' );
-
-	}
-
-	static function status_result( $message )
-	{
-		echo $message .'!';
-	}
-
-	static function oA( $message, $logLevel = IO::LevelResult )
-	{
-
-		IO::outLine( $message, $logLevel );
-
-	}
-
-	static function info( $message, $logLevel = IO::LevelInfo )
-	{
-
-		IO::outLine( $message, $logLevel );
-
-	}
-
-	static function outLine( $message, $logLevel, $trailing = "\n" )
-	{
-
-		if( ! IO::$CC instanceof Console_Color2 )
+		if( $nopre === false )
 		{
-			IO::$CC = new Console_Color2();
+			$out = $this->_buildPre( $message, $level, $post );
 		}
 
-		switch( $logLevel )
-		{
-			case IO::LevelNone:
-				$message = '%w' . $message . '%n';
-				$sep = '%K[ %w--%K ]';
-				break;
-			case IO::LevelInfo:
-				$message = '%n' . $message . '%n';
-				$sep = '%K[ %W-- %K]';
-				break;
-			case IO::LevelSection:
-				$message = '%M' . $message . '%n';
-				$sep = '%m[%M----%m]';
-				break;
-			case IO::LevelNotice:
-				$message = '%n' . $message . '%n';
-				$sep = '%w[ %W--%w ]';
-				break;
-			case IO::LevelResult:
-				$message = '%n' . $message . '%n';
-				$sep = '%g[ %G-- %g]';
-				break;
-			case IO::LevelWarning:
-				$message = '%W' . $message . '%n';
-				$sep = '%r[ %R!!%r ]';
-				break;
-			case IO::LevelWarn:
-				$message = '%W' . $message . '%n';
-				$sep = '%r[ %R--%r ]';
-				break;
-			case IO::LevelError:
-				$message = '%R' . $message . '%n';
-				$sep = '%r[-%R!!%r-]';
-				break;
-			case IO::LevelExit:
-				$message = '%n' . $message . ' %WExiting...%n';
-				$sep = '%w[%W====%w]';
-				break;
-			case IO::LevelAsk:
-				$message = '%n' . $message . '%n';
-				$sep = '%y[ %Y?? %y]';
-				break;
-			case IO::LevelTitle:
-				$message = '%W' . strtoupper($message) . '%n';
-				$sep = '%w[%W====%w]%n';
-				break;
-		}
+		$out = $out . $this->_buildMain( $message, $level, $post );
+		$out = $out . $this->_buildPost( $message, $level, $post );
 
-		if( IO::$inList === true )
+		if( $this->getColor() === true )
 		{
-			$i = str_pad( IO::$countList, 2, 0, STR_PAD_LEFT );
-			$sep = ' %b[ %B-- %b]%n  ';;
-			IO::$countList++;
+			$out = $this->getConsoleColor()->convert( $out );
 		}
 		else
 		{
-			$sep = ' ' . $sep . '%n  ';
+			$out = $this->getConsoleColor()->strip( $out );
 		}
 
-		$out = IO::$CC->convert( IO::outPrefix() . $sep . $message . $trailing );
-		if( IO::$colors !== true )
-		{
-			$out = IO::$CC->strip( $out );
-		}
-
-		echo $out;
-
+		fputs( STDOUT, $out );
+		$this->addCount();
+		
 	}
 
-	static function outPrefix()
+	protected function _buildPre( $message, $level, $post )
 	{
-		global $argv;
+		switch( $level )
+		{
+			case self::Level_Title:
+			case self::Level_Author:
+				$sep = '%W[====]';
+				break;
+			case self::Level_H1:
+				$sep = '%m[%M----%m]';
+				break;
+			case self::Level_Notice:
+			default:
+				$sep = '%K[%w -- %K]';
+				break;
+		}
+		$sep = $sep . '%n';
 
-		IO::$count++;
+		$timecount = @date( 'is' ) . '.' . str_pad( $this->getCount(), 4, 0, STR_PAD_LEFT );
+		$self = basename( __FILE__ );
 
-		$toReturn = '%K[ ' . @date("Gis") . '.' . str_pad( IO::$count, 3, 0, STR_PAD_LEFT ) . ' ' . basename($argv[0]) . ' ]%n ';
-		return $toReturn;
-
+		$out = str_replace( '%TIMECOUNT%', $timecount, $this->_template_pre );
+		$out = str_replace( '%SELF%', $self, $out );
+		$out = str_replace( '%SEP%', $sep, $out );
+		$out = '%K' . $out . '%n';
+		return $out;
 	}
 
-	static function askBool( $message, $default = IO::AskYes )
+	protected function _buildMain( $message, $level, $post )
 	{
-		$asking = true;
-		$badAnswer = false;
-		while( $asking === true )
+		switch( $level )
 		{
-
-			if( $badAnswer === true )
-			{
-				IO::warn( '%nYou must provide an answer of %WY%n (for yes) or %WN%n (for no)...' );
-			}
-
-			if( $default == IO::AskNo )
-			{
-				$yesNo = '%wy%w/%WN';
-			}
-			else
-			{
-				$yesNo = '%WY%w/%wn';
-			}
-			IO::outLine( '%w'.$message.' %w[%n'.$yesNo.'%w]%W: ', IO::LevelAsk, '' );
-
-			$answer = strtolower( trim( fgets(STDIN) ) );
-			if( empty( $answer ) )
-			{
-				return $default;
-			}
-			switch( $answer )
-			{
-				case 'y':
-				case 'yes':
-					return true;
-
-				case 'n':
-				case 'no':
-					return false;
-
-				default:
-					$badAnswer = true;
-					continue;
-			}
+			case self::Level_Title:
+			case self::Level_Author:
+				$message = '%W' . strtoupper( $message );
+				break;
+			case self::Level_H1:
+				$message = '%M' . $message;
+				break;
+			case self::Level_StatusGood:
+				$message = '%G' . $message;
+			case self::Level_StatusBad:
+				$message = '%R' . $message;
+			case self::Level_Notice:
+			default:
+				$message = '%w' . $message;
 		}
+		$message = $message . '%n';
+
+		$out = str_replace( '%MAIN%', $message, $this->_template_main );
+		return $out;
+	}
+
+	protected function _buildPost( $message, $level, $post )
+	{
+		$out = str_replace( '%END%', $post, $this->_template_post );
+		return $out;
 	}
 
 }
+
+$IO = new InOut();
+
+$IO->title( 'Testing new input/output php class' );
+$IO->author( 'By Rob Frawley of Scribe Inc.' );
+$IO->put( 'This is a reqular line' );
+$IO->h1( 'Running sanity checks on enviornment' );
+$IO->status( 'Doing something' );
+$IO->status_good();
 ?>
