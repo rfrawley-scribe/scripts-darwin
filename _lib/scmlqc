@@ -164,10 +164,7 @@ foreach( $dir as $i => $f )
 	/* attempt to read file conte3nts */
 	if( false === ( $contentsRead = @file_get_contents( $root . $f ) ) )
 	{
-		/* let the user know... file not read */
 		IO::warn( 'Could not read file ' . $f );
-
-		/* skip to next loop iteration */
 		continue;
 	}
 
@@ -210,8 +207,6 @@ else
 		if( $return === 0 )
 		{
 			IO::status_result_good( 'valid' );
-
-			/* move on to next for loop iteration */
 			continue;
 		}
 
