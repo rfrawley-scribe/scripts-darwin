@@ -186,9 +186,12 @@ class InOut extends InOut_Abstract
 				$message = '%M' . $message;
 				break;
 			case self::Level_StatusGood:
-				$message = '%G' . $message;
+				$message = '%g' . $message;
+				//$message = '%g< %G' . strtoupper( $message ) . '%g >';
+				break;
 			case self::Level_StatusBad:
-				$message = '%R' . $message;
+				//$message = '%r< %R' . strtoupper( $message ) . '%r >';
+				break;
 			case self::Level_Notice:
 			default:
 				$message = '%w' . $message;
@@ -215,4 +218,7 @@ $IO->put( 'This is a reqular line' );
 $IO->h1( 'Running sanity checks on enviornment' );
 $IO->status( 'Doing something' );
 $IO->status_good();
+$IO->status( 'Doing something' );
+$IO->status_bad();
+$IO->put('——> something');
 ?>

@@ -1,29 +1,49 @@
 <?php 
+/**
+ * ScML Validation Script
+ *
+ * @package scribe
+ * @subpackage darwin
+ * @author Rob Frawley 2nd <rfrawley@scribenet.com>
+ * @license MIT License
+ */
 
-$validateScml = true;
+/**
+ *
+ * CONFIGURATION
+ *
+ */
 
-$root = './';
-$pattern_desc = array(
-	'Watch out for nspaces, mspaces, hairspaces, etc as they will not render properly in Adobe Digital Editions',
-	'ASCII (127-256) characters should be converted to unicode',
-	'There should not be spaces at the beginning of lines',
-	'There should not be spaces at the end of lines',
-	'There should not be double (or more) spaces anywhere',
-	'There should not be two consecutive (or more) newlines (\n) or returns (\r) anywhere',
-	'All ellipses should be converted to \&#160;.\&#160;.\&#160;.',
-	'There should not be spaces proceeding a closing tag',
-	'A character should not follow a closing tag immediatly',
-	'A character should not proceed an opening tag immediatly',
-	'A character should not follow a closing tag immediatly',
-	'A character should not proceed an opening tag immediatly',
-	'There should be no empty <i> tags',
-	'There should be no empty <b> tags',
-	'There should be no empty tags at all',
-	'The HTML less-than entity should be converted to decimal',
-	'The HTML greater-than entity should be converted to decimal'
+/* validate scml? */
+$validate = true;
+
+/* validate using what binary */
+$validateBin = 'xmllint';
+
+/* validate using what flags */
+$validateOpt = '--valid --loaddtd --noout';
+
+/* validator return int definitions */
+$validateRet = array(
+	1 => 'Unclassified',
+	2 => 'Error in DTD',
+	3 => 'Validation error',
+	4 => 'Validation error',
+	5 => 'Error in schema compilation',
+	6 => 'Error writing output',
+	7 => 'Error in pattern (--patten option)',
+	8 => 'Error in Reader registration (--chregister option)',
+	9 => 'Out of memory'
 );
 
-$patterns = array(
+/* root dir from the script's perspective */
+$root = './';
+
+/* check for patterns? */
+$patternCheck = true;
+
+/* validation patterns check */
+$patternRegex = array(
 	'&#xA0;|&#x2002;|&#8195;|&#8194;|&#x00AD;|&#x2003;|&#x2009;|&#8201;|&#x200A',
 	'[‚ƒ„…†‡ˆ‰Š‹Œ‘’“”•–—˜™š›œžŸ¡-¬®-ÿ]|[^\t-~]',
 	'^\t*(<[^>]*)>( )',
@@ -43,150 +63,265 @@ $patterns = array(
 	'&gt;'
 );
 
+/* validation patterns check description */
+$patternDesc = array(
+	'Watch out for nspaces, mspaces, hairspaces, etc as they will not render properly in Adobe Digital Editions',
+	'ASCII (127-256) characters should be converted to unicode',
+	'There should not be spaces at the beginning of lines',
+	'There should not be spaces at the end of lines',
+	'There should not be double (or more) spaces anywhere',
+	'There should not be two consecutive (or more) newlines (\n) or returns (\r) anywhere',
+	'All ellipses should be converted to \&#160;.\&#160;.\&#160;.',
+	'There should not be spaces proceeding a closing tag',
+	'A character should not follow a closing tag immediatly',
+	'A character should not proceed an opening tag immediatly',
+	'A character should not follow a closing tag immediatly',
+	'A character should not proceed an opening tag immediatly',
+	'There should be no empty <i> tags',
+	'There should be no empty <b> tags',
+	'There should be no empty tags at all',
+	'The HTML less-than entity should be converted to decimal',
+	'The HTML greater-than entity should be converted to decimal'
+);
+
+/**
+ *
+ * END CONFIGURATION
+ *
+ */
+
+/**
+ *
+ * go...
+ *
+ */
+
+/* require in/out library */
+/* TODO: migrate to new _inout library, major cleanup from consoleIO library */
 require '/scripts/_lib/consoleIO';
 
-exec( 'rm -fr '.$root.'*xml-error.txt > /dev/null' );
-
+/* welcome message */
 IO::sT( 'Automated ScML Quality Control Operations' );
 IO::sT( 'by Rob Frawley of Scribe Inc.' );
 
-IO::sL( 'Scanning directory for ScML files' );
+/**
+ * 
+ * minimum requirements check
+ * this needs to be expanded to support win soon...
+ *
+ */
 
-$dir = scandir( $root );
+/* sanity/compatability checks */
+IO::os( 'Running sanity checks on enviornment' );
+
+/* check operating system type */
+IO::status_info( 'Checking OS type' );
+switch( @php_uname('s') )
+{
+	case 'Darwin':
+		IO::status_result_good( 'Darwin' );
+		break;
+	default:
+		IO::e( 'Operating system unsuported...' );
+		break;
+}
+
+/* remove previous scml validation errors */
+/* TODO: this needs to be OS independant and not *nix oriented, move to scandir */
+exec( 'rm -fr '.$root.'*xml-error.txt > /dev/null' );
+
+/**
+ *
+ * Read in all ScML files in $root
+ *
+ */
+IO::oS( 'Scanning directory for ScML files' );
+
+/* setup variables to hold file names and contents */
 $files = array();
 $contents = array();
+
+/* attempt to open/scan directory */
+if( false === ( $dir = scandir( $root ) ) ) IO::e( 'Could not open/scan directory: ' . $root );
+
+/* loop through directory files */
 foreach( $dir as $i => $f )
 {
-	$ext = pathinfo( $f, PATHINFO_EXTENSION );
-	if( $ext === 'scml' )
+	/* file needs to be readable...*/
+	if( ! is_readable( $root . $f ) )
 	{
-		IO::o( 'Reading ' . $f . '...' );
-		$files[] = $f;
-		$contents[] = file_get_contents( $root . $f );
+		IO::warn( 'File not readable: ' . $f );
+		continue;
 	}
+
+	/* ignore any files that do *not* have scml extention */
+	if( 'scml' !== pathinfo( $root . $f, PATHINFO_EXTENSION ) ) continue;
+
+	IO::o( 'Reading ' . $f . '...' );
+
+	/* attempt to read file conte3nts */
+	if( false === ( $contentsRead = @file_get_contents( $root . $f ) ) )
+	{
+		/* let the user know... file not read */
+		IO::warn( 'Could not read file ' . $f );
+
+		/* skip to next loop iteration */
+		continue;
+	}
+
+	/* add file name and file contents to respective arrays */
+	$files[] = $f;
+	$contents[] = $contentsRead;
 }
 
-IO::eL();
+/* if no scml files found, exit with error message */
+if( sizeof( $files ) === 0 ) IO::e( 'Could not find any ScML files...' );
 
-if( sizeof( $files ) === 0 )
+/**
+ *
+ * ScML DTD validation
+ *
+ */
+if( $validate === false )
 {
-	IO::e( 'Could not find any ScML files...' );
+	/* display warning when skipping validation */
+	IO::warn( 'Skipping ScML validation as requested...' );
 }
-
-$xmllintReturns = array(
-	1 => 'Unclassified',
-	2 => 'Error in DTD',
-	3 => 'Validation error',
-	4 => 'Validation error',
-	5 => 'Error in schema compilation',
-	6 => 'Error writing output',
-	7 => 'Error in pattern (--patten option)',
-	8 => 'Error in Reader registration (--chregister option)',
-	9 => 'Out of memory'
-);
-
-if( $validateScml === true )
+else
 {
-	IO::os( 'Validating documents against ScML DTD' );
-	for( $i=0; $i<sizeof($files); $i++)
+	/* let's validate! */
+	IO::oS( 'Validating documents against ScML DTD' );
+
+	/* loop over found files */
+	for( $i = 0; $i < sizeof( $files ); $i++ )
 	{
 		IO::status_info( 'Checking file ' . $files[$i] );
 
-		$return = 0;
-		$output = '';
-		exec( 'xmllint --valid --loaddtd --noout ' . $root . $files[$i] . ' 2>&1', $output, $return );
+		/* exec will *append* output to the var passed, so lets unset it first */
+		unset( $return );
+		unset( $output );
 
+		/* execute validation binary */
+		exec( $validateBin . ' ' . $validateOpt . ' ' . $root . $files[$i] . ' 2>&1', $output, $return );
+
+		/* on a return value of 0 (success) */
 		if( $return === 0 )
 		{
-
 			IO::status_result_good( 'valid' );
-			continue;
 
+			/* move on to next for loop iteration */
+			continue;
+		}
+
+		/* if validation returned non-zero value (failure) */
+		IO::status_result_bad( 'not valid' );
+
+		/* get pre-defined return value definition, if available */
+		if( array_key_exists( $return, $validateRet ) )
+		{
+			$errorMsg = $validateRet[ $return ];
+		}
+		/* otherwise, return error is 'undefinable' */
+		else
+		{
+			$errorMsg = 'Undefinable error';
+		}
+
+		/* file to save detailed validator error info */
+		$errorFile = $root . $files[ $i ] . '.xml-error.txt';
+
+		/* get the detailed validator error info */
+		$errorMsgVerbose = '';
+		for( $j = 0; $j < sizeof( $output ); $j++ ) $errorMsgVerbose .= $output[ $j ] . "\n";
+
+		/* save detailed validator error info to file */
+		if( false === @file_put_contents( $errorFile, $errorMsgVerbose ) )
+		{
+			IO::warn( 'Error' . $errorMsg . ' / More info: ' . 'Could not save more info to file ' . $errorFile );
 		}
 		else
 		{
-
-			IO::status_result_bad( 'not valid' );
-
-			if( array_key_exists( $return, $xmllintReturns ) )
-			{
-				$errorMsg = $xmllintReturns[ $return ];
-			}
-			else
-			{
-				$errorMsg = 'Undefinable error';
-			}
-
-			//IO::warn( 'Error: '.$errorMsg );
-
-			$outputToFile = '';
-			$errorFile = $root . $files[$i] . '.xml-error.txt';
-			for( $j=0; $j<sizeof($output); $j++ )
-			{
-				$outputToFile .= $output[$j]."\n";
-			}
-			file_put_contents( $errorFile, $outputToFile );
-
-			IO::warn( 'Error: '.$errorMsg . ' / More info: '.$errorFile );
-
+			IO::warn( 'Error: '.$errorMsg . ' / More info: Check file ' . $errorFile );
 		}
 
 	}
 }
 
-$globalFound = false;
-
-IO::oS( 'Checking files against regular expression QC list' );
-
-for( $i=0; $i<sizeof( $patterns ); $i++ )
+/**
+ * 
+ * Regular expressions checks per:
+ * http://learning.scribenet.com/node/2066#cleanup
+ * http://learning.scribenet.com/node/2070
+ *
+ */
+if( $patternCheck === false )
 {
-	IO::status_info( 'Checking for "'.$patterns[$i].'" regex pattern' );
+	/* display warning when skipping pattern checks */
+	IO::warn( 'Skipping regular expression checks as requested...' );
+}
+else
+{
+	/* lets check! */
+	IO::oS( 'Checking files against regular expression QC list' );
 
-	$found = false;
-	$errorFound = array();
-
-	for( $j=0; $j<sizeof($files); $j++ )
+	/* loop over regex checks */
+	for( $i = 0; $i < sizeof( $patternRegex ); $i++ )
 	{
-		$matches = array();
-		preg_match_all( '/'.$patterns[$i].'/', $contents[$j], $matches );
-		if( sizeof( $matches[0] ) !== 0 )
+		/* let the user know the pattern we are checking against */
+		IO::status_info( 'Checking for "' . $patternRegex[ $i ] . '" regex pattern' );
+
+		/* loop over scml files for this pattern */
+		$patternFound = array();
+		for( $j = 0; $j < sizeof( $files ); $j++ )
 		{
-			$found = true;
-			$globalFound = true;
-			$errorFound[] = $files[$j] . ' (' . sizeof( $matches[0] ) . ' times)';
-			//IO::o( 'Found in "'.$files[$j].'" '.sizeof($matches[0]).' times' );
+			/* perform preg match for pattern */
+			$patternMatches = array();
+			preg_match_all( '/' . $patternRegex[ $i ] . '/', $contents[ $j ], $patternMatches );
+
+			/* add filename to patternFound array if matches found */
+			if( isset( $patternMatches[ 0 ] ) && sizeof( $patternMatches[ 0 ] ) !== 0 )
+			{
+				$patternFound[] = $files[ $j ] . ' (' . sizeof( $patternMatches[ 0 ] ) . ' times)';
+			}
+		}
+
+		/* pattern not found in files */
+		if( sizeof( $patternFound ) === 0 )
+		{
+			/* all good... */
+			IO::status_result_good();
+		}
+		/* pattern found in one or more files */
+		else
+		{
+			/* not so hot... */
+			IO::status_result_bad();
+
+			/* provide pattern description before displaying file occurances */
+			IO::warn( 'Error: ' . $patternDesc[ $i ] . ' / Check file(s):' );
+
+			/* show the files the pattern was found in */
+			for( $j = 0; $j < sizeof( $patternFound ); $j++ ) IO::warn( '   --> ' . $patternFound[ $j ] );
+			
 		}
 	}
-
-	IO::eL();
-
-	if( $found === true )
-	{
-		IO::status_result_bad();
-
-		IO::warn( 'Error: '.$pattern_desc[$i] );
-
-		for( $j=0; $j<sizeof($errorFound); $j++ )
-		{
-			IO::warn( '   --> ' . $errorFound[$j] );
-		}
-		
-	}
-	else
-	{
-		IO::status_result_good();
-		//IO::oA( 'No matches found for pattern!' );
-	}
-
 }
 
-//if( $globalFound === true )
-//{
-	IO::oS( 'Do not forget final QC checks' );
-	IO::o( 'Review http://learning.scribenet.com/node/2066#cleanup' );
-	IO::o( 'Review http://learning.scribenet.com/node/2070' );
-//}
+/**
+ *
+ * Reminder that this *augments* scml qc checks, it does not replace it
+ *
+ */
+IO::oS( 'Do *not* forget final QC checks' );
+IO::o( 'Review http://learning.scribenet.com/node/2066#cleanup' );
+IO::o( 'Review http://learning.scribenet.com/node/2070' );
 
+/*
+ *
+ * Friendly exit display and return value of 0
+ *
+ */
 IO::done( 'Script says, "goodbye..."' );
 
+/* EOF */
 ?>
