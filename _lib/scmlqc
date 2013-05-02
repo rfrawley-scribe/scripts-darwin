@@ -130,7 +130,7 @@ switch( @php_uname('s') )
 
 /* remove previous scml validation errors */
 /* TODO: this needs to be OS independant and not *nix oriented, move to scandir */
-exec( 'rm -fr '.$root.'*xml-error.txt > /dev/null' );
+exec( 'rm ' . $root . '*xml-error.txt > /dev/null' );
 
 /**
  *
