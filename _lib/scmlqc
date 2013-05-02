@@ -4,7 +4,9 @@
  *
  * @package scribe
  * @subpackage darwin
+ *
  * @author Rob Frawley 2nd <rfrawley@scribenet.com>
+ * @copyright Copyright 2013 Scribe Inc.
  * @license MIT License
  */
 
