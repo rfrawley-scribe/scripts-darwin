@@ -159,14 +159,14 @@ foreach( $dir as $i => $f )
 	/* ignore any files that do *not* have scml extention */
 	if( 'scml' !== pathinfo( $root . $f, PATHINFO_EXTENSION ) ) continue;
 
-	IO::o( 'Reading ' . $f . '...' );
-
 	/* attempt to read file conte3nts */
 	if( false === ( $contentsRead = @file_get_contents( $root . $f ) ) )
 	{
-		IO::warn( 'Could not read file ' . $f );
+		IO::warn( 'Could not read file: ' . $f );
 		continue;
 	}
+
+	IO::o( 'Read file ' . $f . '...' );
 
 	/* add file name and file contents to respective arrays */
 	$files[] = $f;
