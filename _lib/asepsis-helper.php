@@ -8,10 +8,7 @@ $download_tmp = '/tmp/Asepsis-1.3.dmg';
 $installer_mount = '/Volumes/Asepsis/';
 $installer_path = $installer_mount . 'Asepsis.mpkg';
 
-require '/scripts/_lib/inout.lib.php';
-
-$IO = new InOut();
-$IO->put( 'Testing!' );
+require '/scripts/_lib/consoleIO';
 
 function scan_dir_for_dscontrol( $dir )
 {

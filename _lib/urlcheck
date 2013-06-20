@@ -1,0 +1,124 @@
+<?php 
+/**
+ *
+ * URL CHECK SCRIPT
+ *
+ * @author Rob Frawley <rfrawley@scribenet.com>
+ * @license MIT License
+ * @version 0.1.0
+ *
+ */
+
+/* root and backup directories */
+$root = '.' . DIRECTORY_SEPARATOR;
+$backup = $root . '.backup' . DIRECTORY_SEPARATOR;
+
+/* file extension to search for */
+$ext = 'scml';
+$pattern = '{\b(?:(?:https?|ftp)://|www\.|ftp\.)(?:\([-a-z0-9+&@#/%=~_|$?!:,.]*\)|[-a-z0-9+&@#/%=~_|$?!:,.])*(?:\([-a-z0-9+&@#/%=~_|$?!:,.]*\)|[a-z0-9+&@#/%=~_|$])}i';
+$invalidResponse = array( 400, 401, 403, 404, 405, 406, 407, 408, 409, 410, 500, 501, 502, 503, 504, 505 );
+/*
+ * require Console IO library 
+ */
+require '/scripts/_lib/consoleIO';
+
+/*
+ * Go...
+ */
+IO::sT( 'URL Validation Operation' );
+IO::sT( 'by Rob Frawley of Scribe Inc.' );
+
+/* clear stat cache, make dir handles, file arrays, etc */
+clearstatcache();
+$dirFiles = scandir( $root );
+$files = array();
+$filesName = array();
+
+/* begin console output list for file listing */
+IO::sL( 'Scanning directory ' . $root . ' for extension ' . $ext );
+
+/* loop through directory files */
+foreach( $dirFiles as $i => $f )
+{
+
+	/* ignore current and parent directory listings, as well as this script itself */
+	if( $f == '.' || $f == '..' || $f == basename(__FILE__) ) continue;
+
+	/* ignore anything not matching the defined extention */
+	if( pathinfo( $f, PATHINFO_EXTENSION ) !== $ext ) continue;
+
+	/* inform user */
+	IO::o( 'Reading '.$f );
+
+	/* file contents and file name arrays */
+	$files[]     = file_get_contents( $root.$f );
+	$filesName[] = $f;
+
+}
+
+if( sizeof( $filesName ) === 0 )
+{
+	IO::eL();
+	IO::done( 'No files found matching "' . $ext . '" extention...' );
+}
+
+/* end console output list */
+IO::eL();
+
+
+$allMatches = array();
+foreach( $files as $i => $f )
+{
+
+	$matches = array();
+	preg_match_all( $pattern, $f, $matches );
+	$allMatches[] = $matches[0];
+
+}
+
+$badUrls = array();
+
+IO::os( 'Checking URL response code:' );
+
+foreach( $allMatches as $i => $m )
+{
+	if(! sizeof($m) > 0) continue;
+
+	for( $j=0; $j<sizeof( $m ); $j++ )
+	{
+		$url = $m[$j];
+
+		if( substr($url, 0, 7) != 'http://' && 
+			substr($url, 0, 8) != 'https://' && 
+			substr($url, 0, 6) != 'ftp://') 
+		{
+			$url = 'http://'.$url;
+		}
+
+		IO::status_info( 'Checking URL: ' . str_replace('%', '%%', $url) );
+
+		$headers = @get_headers($url, 1);
+		$responseCode = @substr(@$headers[0], 9, 3);
+
+		if(in_array($responseCode, $invalidResponse))
+		{
+			IO::status_result_bad( 'Er ['.$responseCode.']' );
+			$badUrls[] = $url;	
+		}
+		elseif(empty($responseCode))
+		{
+			IO::status_result_bad( 'Er [UNKNOWN]' );
+			$badUrls[] = $url;	
+		}
+		else
+		{
+			IO::status_result_good( 'Ok ['.$responseCode.']' );
+		}
+	}
+}
+
+IO::info( 'A total of '.count($badUrls).' bad URLs were found within your ScML file...' );
+
+IO::done( 'All done; goodbye...' );
+exit( 0 );
+?>
