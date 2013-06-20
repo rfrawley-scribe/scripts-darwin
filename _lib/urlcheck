@@ -2,41 +2,68 @@
 /**
  *
  * URL CHECK SCRIPT
+ * Simple script to scan for URLs within an ScML document and determine 
+ * the response code of requesting them
  *
- * @author Rob Frawley <rfrawley@scribenet.com>
- * @license MIT License
  * @version 0.1.0
+ * @author  Rob Frawley <rfrawley@scribenet.com>
+ * @license MIT License
  *
  */
 
-/* root and backup directories */
-$root = '.' . DIRECTORY_SEPARATOR;
+/**
+ *
+ * Configuration
+ *
+ */
 
 /* file extension to search for */
 $ext = 'scml';
+
+/* pattern to find URLs */
 $pattern = '{\b(?:(?:https?|ftp)://|www\.|ftp\.)(?:\([-a-z0-9+&@#/%=~_|$?!:,.]*\)|[-a-z0-9+&@#/%=~_|$?!:,.])*(?:\([-a-z0-9+&@#/%=~_|$?!:,.]*\)|[a-z0-9+&@#/%=~_|$])}i';
+
+/* array of response codes that should throw an error */
 $invalidResponse = array( 400, 401, 403, 404, 405, 406, 407, 408, 409, 410, 500, 501, 502, 503, 504, 505 );
-/*
- * require Console IO library 
+
+/**
+ *
+ * Internal configuration
+ *
  */
+
+/* directory deparator (platform independent) and root directory */
+$ds   = DIRECTORY_SEPARATOR;
+$root = '.' . $ds;
+
+/*
+ *
+ * require any external dependencies
+ *
+ */
+
 require '/scripts/_lib/consoleIO';
 
 /*
+ *
  * Go...
+ *
  */
+
+/* welcome message */
 IO::sT( 'URL Validation Operation' );
 IO::sT( 'by Rob Frawley of Scribe Inc.' );
 
-/* clear stat cache, make dir handles, file arrays, etc */
+/* clear file stat cache, make dir handles, file arrays, etc */
 clearstatcache();
 $dirFiles = scandir( $root );
 $files = array();
 $filesName = array();
 
-/* begin console output list for file listing */
+/* begin console output list for files found */
 IO::sL( 'Scanning directory ' . $root . ' for extension ' . $ext );
 
-/* loop through directory files */
+/* loop through the found files */
 foreach( $dirFiles as $i => $f )
 {
 
@@ -46,7 +73,7 @@ foreach( $dirFiles as $i => $f )
 	/* ignore anything not matching the defined extention */
 	if( pathinfo( $f, PATHINFO_EXTENSION ) !== $ext ) continue;
 
-	/* inform user */
+	/* inform user when valid file found */
 	IO::o( 'Reading '.$f );
 
 	/* file contents and file name arrays */
@@ -55,17 +82,20 @@ foreach( $dirFiles as $i => $f )
 
 }
 
-if( sizeof( $filesName ) === 0 )
-{
-	IO::eL();
-	IO::done( 'No files found matching "' . $ext . '" extention...' );
-}
-
 /* end console output list */
 IO::eL();
 
+/* if no valid files were found there is no need to continue */
+if( sizeof( $filesName ) === 0 )
+{
+	IO::done( 'No files found matching "' . $ext . '" extention...' );
+}
 
+/* matches array and bad URL array */
 $allMatches = array();
+$badUrls = array();
+
+/* loop through files and search for pattern */
 foreach( $files as $i => $f )
 {
 
@@ -75,18 +105,22 @@ foreach( $files as $i => $f )
 
 }
 
-$badUrls = array();
-
+/* inform user, we're 'bout to check them URL response codes! */
 IO::os( 'Checking URL response code:' );
 
+/* this level of the loop is the different files */
 foreach( $allMatches as $i => $m )
 {
+
 	if(! sizeof($m) > 0) continue;
 
+	/* this level of the loop is the URLs themselves */
 	for( $j=0; $j<sizeof( $m ); $j++ )
 	{
+		/* clean varname for the url currently being inspected */
 		$url = $m[$j];
 
+		/* the url must begin with a protocol otherwise the get_headers function will fail */
 		if( substr($url, 0, 7) != 'http://' && 
 			substr($url, 0, 8) != 'https://' && 
 			substr($url, 0, 6) != 'ftp://') 
@@ -94,30 +128,36 @@ foreach( $allMatches as $i => $m )
 			$url = 'http://'.$url;
 		}
 
+		/* tell the user what's happening... */
 		IO::status_info( 'Checking URL: ' . str_replace('%', '%%', $url) );
 
+		/* get headers and response code, using @ to supress *all* warnings/errors */
 		$headers = @get_headers($url, 1);
 		$responseCode = @substr(@$headers[0], 9, 3);
 
+		/* if the response code is blacklisted, url failed */
 		if(in_array($responseCode, $invalidResponse))
 		{
 			IO::status_result_bad( 'Er ['.$responseCode.']' );
 			$badUrls[] = $url;	
 		}
+		/* if no response code was provided, url failed */
 		elseif(empty($responseCode))
 		{
 			IO::status_result_bad( 'Er [UNKNOWN]' );
 			$badUrls[] = $url;	
 		}
+		/* otherwise, yay! */
 		else
 		{
 			IO::status_result_good( 'Ok ['.$responseCode.']' );
 		}
 	}
+
 }
 
+/* totals counts, goodbye message, exit with 0 status code for "all ok" */
 IO::info( 'A total of '.count($badUrls).' bad URLs were found within your ScML file...' );
-
 IO::done( 'All done; goodbye...' );
 exit( 0 );
 ?>
