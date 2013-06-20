@@ -13,7 +13,7 @@
 
 /**
  *
- * Configuration
+ * User configuration variabled
  *
  */
 
@@ -28,7 +28,7 @@ $invalidResponse = array( 400, 401, 403, 404, 405, 406, 407, 408, 409, 410, 500,
 
 /**
  *
- * Internal configuration
+ * Internal configuration variabled
  *
  */
 
@@ -38,7 +38,7 @@ $root = '.' . $ds;
 
 /*
  *
- * require any external dependencies
+ * Inclusion of any external dependencies
  *
  */
 
@@ -157,8 +157,21 @@ foreach( $allMatches as $i => $m )
 
 }
 
-/* totals counts, goodbye message, exit with 0 status code for "all ok" */
-IO::info( 'A total of '.count($badUrls).' bad URLs were found within your ScML file...' );
+/* totals counts... */
+IO::status_info( 'The number of bad URLs found within your ScML files...' );
+
+/* if zero, all green */
+if( count($badUrls) === 0 )
+{
+	IO::status_result_good(0);
+}
+/* if not zero, bad */
+else
+{
+	IO::status_result_bad(count($badUrls));
+}
+
+/* goodbye message, exit with 0 status code for "all ok" */
 IO::done( 'All done; goodbye...' );
 exit( 0 );
 ?>
