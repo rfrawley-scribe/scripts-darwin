@@ -11,7 +11,6 @@
 
 /* root and backup directories */
 $root = '.' . DIRECTORY_SEPARATOR;
-$backup = $root . '.backup' . DIRECTORY_SEPARATOR;
 
 /* file extension to search for */
 $ext = 'scml';
