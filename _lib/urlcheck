@@ -5,7 +5,7 @@
  * Simple script to scan for URLs within an ScML document and determine 
  * the response code of requesting them
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author  Rob Frawley <rfrawley@scribenet.com>
  * @license MIT License
  *
@@ -112,6 +112,7 @@ IO::os( 'Checking URL response code:' );
 foreach( $allMatches as $i => $m )
 {
 
+	/* no matches found? break this loop iteration and continue to next file */
 	if(! sizeof($m) > 0) continue;
 
 	/* this level of the loop is the URLs themselves */
