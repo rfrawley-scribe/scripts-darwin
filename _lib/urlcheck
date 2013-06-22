@@ -53,6 +53,172 @@ require '/scripts/_lib/consoleIO';
 
 /*
  *
+ * sub-routine declarations
+ *
+ */
+
+function getResponseCode( $url )
+{
+
+	/* get response code from header, use @ to supress *all* warnings */
+	$headers = @get_headers( $url, 1 );
+	return @substr( @$headers[0], 9, 3 );
+
+}
+
+function requireProtocol( $url )
+{
+
+	/* the url must begin with a protocol for get_headers to succeed */
+	if( substr($url, 0, 7) !== 'http://' && 
+		substr($url, 0, 8) !== 'https://' ) 
+	{
+		$url = 'http://'.$url;
+	}
+
+	return $url;
+
+}
+
+function performUrlsCheck( 
+	$urls, 
+	$invalidResponse = array( 404 ), 
+	$headerText = 'Checking URL response code:' )
+{
+
+	/* inform user, we're 'bout to check them URL response codes! */
+	IO::os( $headerText );
+
+	/* initialize badUrl array */
+	$badUrls = array();
+
+	/* this level of the loop is the URLs themselves */
+	foreach( $urls as $i => $url )
+	{
+
+		/* a protocol is required... */
+		$url = requireProtocol( $url );
+
+		/* tell the user what's happening... */
+		IO::status_info( 'Checking URL: ' . str_replace('%', '%%', $url) );
+
+		/* get the response code */
+		$responseCode = getResponseCode( $url );
+
+		/* if the response code is blacklisted, url failed */
+		if( in_array($responseCode, $invalidResponse) )
+		{
+			IO::status_result_bad( 'Er ['.$responseCode.']' );
+			$badUrls[] = $url;	
+		}
+		/* if no response code was provided, url failed */
+		elseif( empty($responseCode) )
+		{
+			IO::status_result_bad( 'Er [UNKNOWN]' );
+
+			/* www are added sometimes when they should not... */
+			$urlAlt = str_replace( '://www.', '://', $url );
+
+			/* tell the user what's happening... */
+			IO::status_info( 'Re-checking URL (w/o www): ' . str_replace('%', '%%', $urlAlt) );
+
+			/* get response code */
+			$responseCode = getResponseCode( $urlAlt );
+
+			/* if the response code is blacklisted, url failed */
+			if( in_array($responseCode, $invalidResponse) )
+			{
+				IO::status_result_bad( 'Er ['.$responseCode.']' );
+				$badUrls[] = $url;	
+			}
+			/* otherwise, yay! */
+			else
+			{
+				IO::status_result_good( 'Ok ['.$responseCode.']' );
+				IO::warn( 'The URL '.$url.' should read '.$urlAlt );
+			}
+
+		}
+		/* otherwise, yay! */
+		else
+		{
+			IO::status_result_good( 'Ok ['.$responseCode.']' );
+		}
+
+	}
+
+	/* return the failed urls */
+	return $badUrls;
+
+}
+
+function readDirectoryAndMatch( $root, $ext, $patterns )
+{
+
+	/* inform user that we're scanning the directory */
+	IO::os( 'Scanning directory '.$root.' for extention '.$ext );
+
+	/* clear file stat cache */
+	clearstatcache();
+
+	/* initialize matches var */
+	$allMatches = array();
+
+	/* scan directory for files */
+	$dirFiles   = scandir( $root );
+
+	/* loop through the found files */
+	foreach( $dirFiles as $i => $f )
+	{
+
+		/* ignore current and parent directory, as well as this script itself */
+		if( $f == '.' || $f == '..' || $f == basename(__FILE__) ) continue;
+
+		/* ignore anything not matching the defined extention */
+		if( pathinfo( $f, PATHINFO_EXTENSION ) !== $ext ) continue;
+
+		/* inform user when valid file found */
+		IO::o( 'Reading '.$f );
+
+		/* file contents and file name arrays */
+		$file = file_get_contents( $root.$f );
+
+		/* loop through defined search patterns */
+		for( $j = 0; $j < count($patterns); $j++ )
+		{
+			/* reset matches to empty array */
+			$matches = array();
+
+			/* do the search on file contents */
+			preg_match_all( $patterns[$j], $file, $matches );
+
+			/* the matches we want are located at index 1 */
+			$matches = isset( $matches[1]) && is_array($matches[1] ) ? 
+				$matches[1] :
+				array()
+			;
+
+			/* loop through matches */
+			foreach( $matches as $k => $m )
+			{
+				/* only add each url to the matches list once */
+				if(! in_array( $m, $allMatches ) )
+				{
+					$allMatches[] = $m;
+				}
+
+			}
+		}
+	}
+
+
+	/* return the matches */
+	return $allMatches;
+
+}
+
+/*
+ *
  * Go...
  *
  */
@@ -61,135 +227,21 @@ require '/scripts/_lib/consoleIO';
 IO::sT( 'URL Validation Operation' );
 IO::sT( 'by Rob Frawley of Scribe Inc.' );
 
-/* clear file stat cache */
-clearstatcache();
+/* read directory */
+$allMatches = readDirectoryAndMatch( $root, $ext, $patterns );
 
-/* dir handle and file name and content arrays */
-$dirFiles  = scandir( $root );
-$files     = array();
-$filesName = array();
+/* perform first-round check */
+$badUrls = performUrlsCheck( 
+	$allMatches, 
+	$invalidResponse 
+);
 
-/* begin console output list for files found */
-IO::sL( 'Scanning directory ' . $root . ' for extension ' . $ext );
-
-/* loop through the found files */
-foreach( $dirFiles as $i => $f )
-{
-
-	/* ignore current and parent directory listings, as well as this script itself */
-	if( $f == '.' || $f == '..' || $f == basename(__FILE__) ) continue;
-
-	/* ignore anything not matching the defined extention */
-	if( pathinfo( $f, PATHINFO_EXTENSION ) !== $ext ) continue;
-
-	/* inform user when valid file found */
-	IO::o( 'Reading '.$f );
-
-	/* file contents and file name arrays */
-	$files[]     = file_get_contents( $root.$f );
-	$filesName[] = $f;
-
-}
-
-/* end console output list */
-IO::eL();
-
-/* if no valid files were found there is no need to continue */
-if( sizeof( $filesName ) === 0 )
-{
-	IO::done( 'No files found matching "' . $ext . '" extention...' );
-}
-
-/* matches array and bad URL array */
-$allMatches = array();
-$badUrls = array();
-
-/* loop through files and search for pattern */
-foreach( $files as $i => $f )
-{
-
-	/* define matches array for file index */
-	$allMatches[$i] = array();
-
-	/* loop through defined search patterns */
-	for( $j = 0; $j < count($patterns); $j++ )
-	{
-		/* reset matches to empty array */
-		$matches = array();
-
-		/* do the search on file contents */
-		preg_match_all( $patterns[$j], $f, $matches );
-
-		/* the matches we want are located at index 0 */
-		$matches = isset($matches[1]) && is_array($matches[1]) ? 
-			$matches[1] :
-			array()
-		;
-
-		/* only add each url to the matches list once */
-		foreach( $matches as $k => $m )
-		{
-
-			if(! in_array( $m, $allMatches[$i] ) )
-			{
-				$allMatches[$i][] = $m;
-			}
-
-		}
-	}
-
-}
-
-/* inform user, we're 'bout to check them URL response codes! */
-IO::os( 'Checking URL response code:' );
-
-/* this level of the loop is the different files */
-foreach( $allMatches as $i => $m )
-{
-
-	/* no matches found? break this loop iteration and continue to next file */
-	if(! sizeof($m) > 0) continue;
-
-	/* this level of the loop is the URLs themselves */
-	for( $j=0; $j<sizeof( $m ); $j++ )
-	{
-		/* clean varname for the url currently being inspected */
-		$url = $m[$j];
-
-		/* the url must begin with a protocol otherwise the get_headers function will fail */
-		if( substr($url, 0, 7) !== 'http://' && 
-			substr($url, 0, 8) !== 'https://' ) 
-		{
-			$url = 'http://'.$url;
-		}
-
-		/* tell the user what's happening... */
-		IO::status_info( 'Checking URL: ' . str_replace('%', '%%', $url) );
-
-		/* get headers and response code, using @ to supress *all* warnings/errors */
-		$headers = @get_headers($url, 1);
-		$responseCode = @substr(@$headers[0], 9, 3);
-
-		/* if the response code is blacklisted, url failed */
-		if(in_array($responseCode, $invalidResponse))
-		{
-			IO::status_result_bad( 'Er ['.$responseCode.']' );
-			$badUrls[] = $url;	
-		}
-		/* if no response code was provided, url failed */
-		elseif(empty($responseCode))
-		{
-			IO::status_result_bad( 'Er [UNKNOWN]' );
-			$badUrls[] = $url;	
-		}
-		/* otherwise, yay! */
-		else
-		{
-			IO::status_result_good( 'Ok ['.$responseCode.']' );
-		}
-	}
-
-}
+/* perform second-round check on previous failures */
+$badUrls = performUrlsCheck( 
+	$badUrls, 
+	$invalidResponse, 
+	'Re-Checking failed URLs' 
+);
 
 /* totals counts... */
 IO::status_info( 'The number of bad URLs found within your ScML files...' );
@@ -197,12 +249,12 @@ IO::status_info( 'The number of bad URLs found within your ScML files...' );
 /* if zero, all green */
 if( count($badUrls) === 0 )
 {
-	IO::status_result_good(0);
+	IO::status_result_good( 0 );
 }
 /* if not zero, bad */
 else
 {
-	IO::status_result_bad(count($badUrls));
+	IO::status_result_bad( count($badUrls) );
 }
 
 /* goodbye message, exit with 0 status code for "all ok" */
