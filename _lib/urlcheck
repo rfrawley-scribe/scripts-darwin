@@ -2,10 +2,11 @@
 /**
  *
  * URL CHECK SCRIPT
- * Simple script to scan for URLs within an ScML document and determine 
- * the response code of requesting them
+ * Simple script to locate urls within any text file--using a set of regular 
+ * expressions--and determine their validity based on the header response code 
+ * returned for each url
  *
- * @version 0.1.1
+ * @version 0.1.2
  * @author  Rob Frawley <rfrawley@scribenet.com>
  * @license MIT License
  *
@@ -13,7 +14,7 @@
 
 /**
  *
- * User configuration variabled
+ * User configuration variables
  *
  */
 
@@ -21,14 +22,20 @@
 $ext = 'scml';
 
 /* pattern to find URLs */
-$pattern = '{\b(?:(?:https?|ftp)://|www\.|ftp\.)(?:\([-a-z0-9+&@#/%=~_|$?!:,.]*\)|[-a-z0-9+&@#/%=~_|$?!:,.])*(?:\([-a-z0-9+&@#/%=~_|$?!:,.]*\)|[a-z0-9+&@#/%=~_|$])}i';
+$patterns = array(
+	'{<url id="(.*?)">.*?</url>}i',
+	'{<url>(.*?)</url>}i'
+);
 
 /* array of response codes that should throw an error */
-$invalidResponse = array( 400, 401, 403, 404, 405, 406, 407, 408, 409, 410, 500, 501, 502, 503, 504, 505 );
+$invalidResponse = array( 
+	400, 401, 403, 404, 405, 406, 407, 408, 409, 410, 
+	500, 501, 502, 503, 504, 505, 507, 508, 509, 510
+);
 
 /**
  *
- * Internal configuration variabled
+ * Internal configuration variables
  *
  */
 
@@ -54,10 +61,12 @@ require '/scripts/_lib/consoleIO';
 IO::sT( 'URL Validation Operation' );
 IO::sT( 'by Rob Frawley of Scribe Inc.' );
 
-/* clear file stat cache, make dir handles, file arrays, etc */
+/* clear file stat cache */
 clearstatcache();
-$dirFiles = scandir( $root );
-$files = array();
+
+/* dir handle and file name and content arrays */
+$dirFiles  = scandir( $root );
+$files     = array();
 $filesName = array();
 
 /* begin console output list for files found */
@@ -99,9 +108,35 @@ $badUrls = array();
 foreach( $files as $i => $f )
 {
 
-	$matches = array();
-	preg_match_all( $pattern, $f, $matches );
-	$allMatches[] = $matches[0];
+	/* define matches array for file index */
+	$allMatches[$i] = array();
+
+	/* loop through defined search patterns */
+	for( $j = 0; $j < count($patterns); $j++ )
+	{
+		/* reset matches to empty array */
+		$matches = array();
+
+		/* do the search on file contents */
+		preg_match_all( $patterns[$j], $f, $matches );
+
+		/* the matches we want are located at index 0 */
+		$matches = isset($matches[1]) && is_array($matches[1]) ? 
+			$matches[1] :
+			array()
+		;
+
+		/* only add each url to the matches list once */
+		foreach( $matches as $k => $m )
+		{
+
+			if(! in_array( $m, $allMatches[$i] ) )
+			{
+				$allMatches[$i][] = $m;
+			}
+
+		}
+	}
 
 }
 
@@ -122,9 +157,8 @@ foreach( $allMatches as $i => $m )
 		$url = $m[$j];
 
 		/* the url must begin with a protocol otherwise the get_headers function will fail */
-		if( substr($url, 0, 7) != 'http://' && 
-			substr($url, 0, 8) != 'https://' && 
-			substr($url, 0, 6) != 'ftp://') 
+		if( substr($url, 0, 7) !== 'http://' && 
+			substr($url, 0, 8) !== 'https://' ) 
 		{
 			$url = 'http://'.$url;
 		}
